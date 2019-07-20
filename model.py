@@ -51,6 +51,7 @@ class cyclegan(object):
 
         self.fake_B = self.generator(self.real_A, self.options, False, name="generatorA2B")
         self.fake_A_ = self.generator(self.fake_B, self.options, False, name="generatorB2A")
+
         self.fake_A = self.generator(self.real_B, self.options, True, name="generatorB2A")
         self.fake_B_ = self.generator(self.fake_A, self.options, True, name="generatorA2B")
 
@@ -146,15 +147,25 @@ class cyclegan(object):
             batch_idxs = min(min(len(dataA), len(dataB)), args.train_size) // self.batch_size
             lr = args.lr if epoch < args.epoch_step else args.lr*(args.epoch-epoch)/(args.epoch-args.epoch_step)
 
+            test_dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testA'))
+            test_dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testB'))
+            test_batch_files = list(zip(test_dataA[:self.batch_size], test_dataB[:self.batch_size]))
+            test_sample_images = [load_train_data(batch_file, is_testing=True) for batch_file in test_batch_files]
+            test_sample_images = np.array(test_sample_images).astype(np.float32)
+
+
             for idx in range(0, batch_idxs):
                 batch_files = list(zip(dataA[idx * self.batch_size:(idx + 1) * self.batch_size],
                                        dataB[idx * self.batch_size:(idx + 1) * self.batch_size]))
                 batch_images = [load_train_data(batch_file, args.load_size, args.fine_size) for batch_file in batch_files]
                 batch_images = np.array(batch_images).astype(np.float32)
 
+                # real_A -> fake_B -> fake_A_
+                # real_B -> fake_A -> fake_B_
+
                 # Update G network and record fake outputs
-                fake_A, fake_B, _, summary_str = self.sess.run(
-                    [self.fake_A, self.fake_B, self.g_optim, self.g_sum],
+                real_A, real_B, fake_A, fake_B, fake_A_, fake_B_, _, summary_str = self.sess.run(
+                    [self.real_A, self.real_B, self.fake_A, self.fake_B, self.fake_A_, self.fake_B_, self.g_optim, self.g_sum],
                     feed_dict={self.real_data: batch_images, self.lr: lr})
                 self.writer.add_summary(summary_str, counter)
                 [fake_A, fake_B] = self.pool([fake_A, fake_B])
@@ -172,161 +183,60 @@ class cyclegan(object):
                 print(("Epoch: [%2d] [%4d/%4d] time: %4.4f" % (
                     epoch, idx, batch_idxs, time.time() - start_time)))
 
-                # if np.mod(counter, args.print_freq) == 1:
-                #     self.sample_model(args.sample_dir, epoch, idx)
-
-                # if np.mod(counter, args.save_freq) == 2:
-                #     self.save(args.checkpoint_dir, counter)
-
                 if np.mod(counter, 1) == 0:
-
-					save_images(data_B, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_02_A2B_real_B.png'.format(self.output_dir, epoch, index))
-					save_images(data_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_12_B2A_real_A.png'.format(self.output_dir, epoch, index))
-
-					save_images(data_A, [self.batch_size, 1],
+                    
+                    # real_A -> fake_B -> fake_A_
+                    # real_B -> fake_A -> fake_B_
+					save_images(real_A, [self.batch_size, 1],
 						'./{}/ep{:02d}_{:04d}_01_A2B_real_A.png'.format(self.output_dir, epoch, index))
-					save_images(fake_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_03_A2B_fake_A.png'.format(self.output_dir, epoch, index))
-					save_images(revised_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_04_A2B_revise_A.png'.format(self.output_dir, epoch, index))
-					save_images(recovered_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_05_A2B_recover_A.png'.format(self.output_dir, epoch, index))
+					save_images(fake_B, [self.batch_size, 1],
+						'./{}/ep{:02d}_{:04d}_03_B2A_gen_A.png'.format(self.output_dir, epoch, index))
+					save_images(fake_A_, [self.batch_size, 1],
+						'./{}/ep{:02d}_{:04d}_04_A2B_recover_A.png'.format(self.output_dir, epoch, index))
 
 					
-					save_images(data_B, [self.batch_size, 1],
+					save_images(real_B, [self.batch_size, 1],
 						'./{}/ep{:02d}_{:04d}_11_B2A_real_B.png'.format(self.output_dir, epoch, index))
-					save_images(generated_B, [self.batch_size, 1],
+					save_images(fake_A, [self.batch_size, 1],
 						'./{}/ep{:02d}_{:04d}_13_B2A_gen_B.png'.format(self.output_dir, epoch, index))
-					save_images(revised_B, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_14_B2A_revise_B.png'.format(self.output_dir, epoch, index))
-					save_images(recovered_B, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_15_B2A_recover_B.png'.format(self.output_dir, epoch, index))
-
-			for sample_index in xrange(min(len(test_dataset_A), len(test_dataset_B))):
-			# A2B
-			generated_A = sess.run(self.generated_A, feed_dict={self.input_real_data_A: test_data_A_list[sample_index]}) 
-			revised_A = sess.run(self.revised_A, feed_dict={self.input_real_data_A: test_data_A_list[sample_index]}) 
-			recovered_A = sess.run(self.recovered_A, feed_dict={self.input_generated_A: generated_A}) 
+					save_images(fake_B_, [self.batch_size, 1],
+						'./{}/ep{:02d}_{:04d}_14_B2A_recover_B.png'.format(self.output_dir, epoch, index))
 
 
-			# B2A
-			generated_B = sess.run(self.generated_B, feed_dict={self.input_real_data_B: test_data_B_list[sample_index]}) 
-			revised_B = sess.run(self.revised_B, feed_dict={self.input_real_data_B: test_data_B_list[sample_index]})
-			recovered_B = sess.run(self.recovered_B, feed_dict={self.input_generated_B: generated_B}) 
+                    # compare part
+                    save_images(real_B, [self.batch_size, 1],
+						'./{}/ep{:02d}_{:04d}_02_B2A_real_B.png'.format(self.output_dir, epoch, index))
+                    save_images(real_A, [self.batch_size, 1],
+						'./{}/ep{:02d}_{:04d}_12_A2B_real_A.png'.format(self.output_dir, epoch, index))
 
 
-			# save_images(generated_A, [self.batch_size, 1],
-			# 			'./{}/testA_{:02d}_ep{:02d}_01_gen.png'.format(self.sample_dir, sample_index, epoch))
-			# save_images(revised_A, [self.batch_size, 1],
-			# 			'./{}/testA_{:02d}_ep{:02d}_02_revised.png'.format(self.sample_dir, sample_index, epoch))
-			# save_images(recovered_A, [self.batch_size, 1],
-			# 			'./{}/testA_{:02d}_ep{:02d}_03_recovered.png'.format(self.sample_dir, sample_index, epoch))
+			for sample_index in xrange(min(len(test_dataA), len(test_dataB))):
 
-			# save_images(generated_B, [self.batch_size, 1],
-			# 			'./{}/testB_{:02d}_ep{:02d}_01_gen.png'.format(self.sample_dir, sample_index, epoch))
-			# save_images(revised_B, [self.batch_size, 1],
-			# 			'./{}/testB_{:02d}_ep{:02d}_02_revised.png'.format(self.sample_dir, sample_index, epoch))
-			# save_images(recovered_B, [self.batch_size, 1],
-			# 			'./{}/testB_{:02d}_ep{:02d}_03_recovered.png'.format(self.sample_dir, sample_index, epoch))
+                real_A, real_B, fake_A, fake_B, fake_A_, fake_B_,= self.sess.run(
+                    [self.real_A, self.real_B, self.fake_A, self.fake_B, self.fake_A_, self.fake_B_],
+                    feed_dict={self.real_data: test_batch_images})
 
+                # real_A -> fake_B -> fake_A_
+                # real_B -> fake_A -> fake_B_
 
-			save_images(test_data_A_list[sample_index], [self.batch_size, 1],
-						'./{}/testA_{:02d}_ep{:02d}_01_real_A.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(data_B, [self.batch_size, 1],
-						'./{}/testA_{:02d}_ep{:02d}_02_real_B.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(generated_A, [self.batch_size, 1],
-						'./{}/testA_{:02d}_ep{:02d}_03_gen_A.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(revised_A, [self.batch_size, 1],
-						'./{}/testA_{:02d}_ep{:02d}_04_revised_A.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(recovered_A, [self.batch_size, 1],
-						'./{}/testA_{:02d}_ep{:02d}_05_recovered_A.png'.format(self.sample_dir, sample_index, epoch))
+                save_images(real_A, [self.batch_size, 1],
+							'./{}/testA_{:02d}_ep{:02d}_01_real_A.png'.format(self.sample_dir, sample_index, epoch))
+				save_images(real_B, [self.batch_size, 1],
+							'./{}/testA_{:02d}_ep{:02d}_02_real_B.png'.format(self.sample_dir, sample_index, epoch))
+				save_images(fake_B, [self.batch_size, 1],
+							'./{}/testA_{:02d}_ep{:02d}_03_gen_A.png'.format(self.sample_dir, sample_index, epoch))
+				save_images(fake_A_, [self.batch_size, 1],
+							'./{}/testA_{:02d}_ep{:02d}_05_recovered_A.png'.format(self.sample_dir, sample_index, epoch))
 
 
-			save_images(test_data_B_list[sample_index], [self.batch_size, 1],
-						'./{}/testB_{:02d}_ep{:02d}_11_real_B.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(data_A, [self.batch_size, 1],
-						'./{}/testB_{:02d}_ep{:02d}_12_real_A.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(generated_B, [self.batch_size, 1],
-						'./{}/testB_{:02d}_ep{:02d}_13_gen_B.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(revised_B, [self.batch_size, 1],
-						'./{}/testB_{:02d}_ep{:02d}_14_revised_B.png'.format(self.sample_dir, sample_index, epoch))
-			save_images(recovered_B, [self.batch_size, 1],
-						'./{}/testB_{:02d}_ep{:02d}_15_recovered_B.png'.format(self.sample_dir, sample_index, epoch))
-
-
-			# save_images(data_A, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_01_A2B_real_A.png'.format(self.sample_dir, epoch, index))
-			# save_images(data_B, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_02_A2B_real_B.png'.format(self.sample_dir, epoch, index))
-			# save_images(generated_A, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_03_A2B_gen_A.png'.format(self.sample_dir, epoch, index))
-			# save_images(revised_A, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_04_A2B_revise_A.png'.format(self.sample_dir, epoch, index))
-			# save_images(recovered_A, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_05_A2B_recover_A.png'.format(self.sample_dir, epoch, index))
-
-			
-			# save_images(data_B, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_11_B2A_real_B.png'.format(self.sample_dir, epoch, index))
-			# save_images(data_A, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_12_B2A_real_A.png'.format(self.sample_dir, epoch, index))
-			# save_images(generated_B, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_13_B2A_gen_B.png'.format(self.sample_dir, epoch, index))
-			# save_images(revised_B, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_14_B2A_revise_B.png'.format(self.sample_dir, epoch, index))
-			# save_images(recovered_B, [self.batch_size, 1],
-			# 	'./{}/ep{:02d}_{:04d}_15_B2A_recover_B.png'.format(self.sample_dir, epoch, index))
-
-
-			if sample_index == 0:
-				# step D2: update descriptor net
-				# A2B des : learning B features
-				A2B_descriptor_loss = sess.run(self.A2B_des_loss, feed_dict={self.input_revised_A: revised_A, self.input_real_data_B: data_B})
-				B2A_descriptor_loss = sess.run(self.B2A_des_loss, feed_dict={self.input_revised_B: revised_B, self.input_real_data_A: data_A})
-
-				# step G2: update A2B generator net
-				A2B_generator_loss = sess.run(self.A2B_gen_loss, feed_dict={self.input_real_data_A: data_A, self.input_real_data_B: data_B})
-				B2A_generator_loss = sess.run(self.B2A_gen_loss, feed_dict={self.input_real_data_A: data_A, self.input_real_data_B: data_B}) 
-
-				# step R2: A2B cycle loss (A, gen_A2B), (B, gen_B2A)
-				A2B_cycle_loss = sess.run(self.A2B_cycle_loss, feed_dict={self.input_generated_A: generated_A, self.input_real_data_A: data_A})
-				B2A_cycle_loss = sess.run(self.B2A_cycle_loss, feed_dict={self.input_generated_B: generated_B, self.input_real_data_B: data_B})
-
-
-				epoch_test_A2B_des_loss_vis.add_loss_val(epoch, A2B_descriptor_loss / float(self.image_size * self.image_size * 3))
-				epoch_test_A2B_gen_loss_vis.add_loss_val(epoch, A2B_generator_loss)
-				epoch_test_A2B_cycle_loss_vis.add_loss_val(epoch, A2B_cycle_loss)
-				epoch_test_B2A_des_loss_vis.add_loss_val(epoch, B2A_descriptor_loss / float(self.image_size * self.image_size * 3))
-				epoch_test_B2A_gen_loss_vis.add_loss_val(epoch, B2A_generator_loss)
-				epoch_test_B2A_cycle_loss_vis.add_loss_val(epoch, B2A_cycle_loss)
-
-				epoch_test_A2B_des_loss_vis.draw_figure()
-				epoch_test_A2B_gen_loss_vis.draw_figure()
-				epoch_test_A2B_cycle_loss_vis.draw_figure()
-				epoch_test_B2A_des_loss_vis.draw_figure()
-				epoch_test_B2A_gen_loss_vis.draw_figure()
-				epoch_test_B2A_cycle_loss_vis.draw_figure()
-
-
-
-			epoch_avg_A2B_des_loss_vis.add_loss_val(epoch, np.mean(A2B_des_loss_avg) / float(self.image_size * self.image_size * 3))
-			epoch_avg_A2B_gen_loss_vis.add_loss_val(epoch, np.mean(A2B_gen_loss_avg))
-			epoch_avg_A2B_cycle_loss_vis.add_loss_val(epoch, np.mean(A2B_cycle_loss_avg))
-			epoch_avg_B2A_des_loss_vis.add_loss_val(epoch, np.mean(B2A_des_loss_avg) / float(self.image_size * self.image_size * 3))
-			epoch_avg_B2A_gen_loss_vis.add_loss_val(epoch, np.mean(B2A_gen_loss_avg))
-			epoch_avg_B2A_cycle_loss_vis.add_loss_val(epoch, np.mean(B2A_cycle_loss_avg))
-
-			epoch_avg_A2B_des_loss_vis.draw_figure()
-			epoch_avg_A2B_gen_loss_vis.draw_figure()
-			epoch_avg_A2B_cycle_loss_vis.draw_figure()
-			epoch_avg_B2A_des_loss_vis.draw_figure()
-			epoch_avg_B2A_gen_loss_vis.draw_figure()
-			epoch_avg_B2A_cycle_loss_vis.draw_figure()
-					
-			self.save(self.checkpoint_dir, epoch)
-
+				save_images(real_B, [self.batch_size, 1],
+							'./{}/testB_{:02d}_ep{:02d}_11_real_B.png'.format(self.sample_dir, sample_index, epoch))
+				save_images(real_A, [self.batch_size, 1],
+							'./{}/testB_{:02d}_ep{:02d}_12_real_A.png'.format(self.sample_dir, sample_index, epoch))
+				save_images(fake_A, [self.batch_size, 1],
+							'./{}/testB_{:02d}_ep{:02d}_13_gen_B.png'.format(self.sample_dir, sample_index, epoch))
+				save_images(fake_B_, [self.batch_size, 1],
+							'./{}/testB_{:02d}_ep{:02d}_15_recovered_B.png'.format(self.sample_dir, sample_index, epoch))
 
 
     def save(self, checkpoint_dir, step):
@@ -356,22 +266,14 @@ class cyclegan(object):
             return False
 
     def sample_model(self, sample_dir, epoch, idx):
-        dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testA'))
-        dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testB'))
-        np.random.shuffle(dataA)
-        np.random.shuffle(dataB)
-        batch_files = list(zip(dataA[:self.batch_size], dataB[:self.batch_size]))
-        sample_images = [load_train_data(batch_file, is_testing=True) for batch_file in batch_files]
-        sample_images = np.array(sample_images).astype(np.float32)
+    
+        # np.random.shuffle(dataA)
+        # np.random.shuffle(dataB)
 
         fake_A, fake_B = self.sess.run(
             [self.fake_A, self.fake_B],
-            feed_dict={self.real_data: sample_images}
+            feed_dict={self.real_data: test_sample_images}
         )
-        save_images(fake_A, [self.batch_size, 1],
-                    './{}/A_{:02d}_{:04d}.jpg'.format(sample_dir, epoch, idx))
-        save_images(fake_B, [self.batch_size, 1],
-                    './{}/B_{:02d}_{:04d}.jpg'.format(sample_dir, epoch, idx))
 
     def test(self, args):
         """Test cyclegan"""
