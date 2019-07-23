@@ -59,12 +59,15 @@ class cyclegan(object):
 
 		self.DB_fake = self.discriminator(self.fake_B, self.options, reuse=False, name="discriminatorB")
 		self.DA_fake = self.discriminator(self.fake_A, self.options, reuse=False, name="discriminatorA")
+		# a2b loss (fake and judge fake(ones_like)) 
 		self.g_loss_a2b = self.criterionGAN(self.DB_fake, tf.ones_like(self.DB_fake)) \
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
 		    + self.L1_lambda * abs_criterion(self.real_B, self.fake_B_)
+		# b2a loss (fake and judge fake(ones_like)) 
 		self.g_loss_b2a = self.criterionGAN(self.DA_fake, tf.ones_like(self.DA_fake)) \
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
 		    + self.L1_lambda * abs_criterion(self.real_B, self.fake_B_)
+
 		self.g_loss = self.criterionGAN(self.DA_fake, tf.ones_like(self.DA_fake)) \
 		    + self.criterionGAN(self.DB_fake, tf.ones_like(self.DB_fake)) \
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
@@ -81,25 +84,29 @@ class cyclegan(object):
 		self.DB_fake_sample = self.discriminator(self.fake_B_sample, self.options, reuse=True, name="discriminatorB")
 		self.DA_fake_sample = self.discriminator(self.fake_A_sample, self.options, reuse=True, name="discriminatorA")
 
-		self.db_loss_real = self.criterionGAN(self.DB_real, tf.ones_like(self.DB_real))
-		self.db_loss_fake = self.criterionGAN(self.DB_fake_sample, tf.zeros_like(self.DB_fake_sample))
+		self.db_loss_real = self.criterionGAN(self.DB_real, tf.ones_like(self.DB_real)) # b loss (real and judge_fake(ones_like)) 
+		self.db_loss_fake = self.criterionGAN(self.DB_fake_sample, tf.zeros_like(self.DB_fake_sample)) # b loss (fake and judge_real(zeros_like)) 
 		self.db_loss = (self.db_loss_real + self.db_loss_fake) / 2
-		self.da_loss_real = self.criterionGAN(self.DA_real, tf.ones_like(self.DA_real))
-		self.da_loss_fake = self.criterionGAN(self.DA_fake_sample, tf.zeros_like(self.DA_fake_sample))
+		self.da_loss_real = self.criterionGAN(self.DA_real, tf.ones_like(self.DA_real)) # a loss (fake and judge_real(zeros_like))
+		self.da_loss_fake = self.criterionGAN(self.DA_fake_sample, tf.zeros_like(self.DA_fake_sample)) # a loss (fake and judge_real(zeros_like)) 
 		self.da_loss = (self.da_loss_real + self.da_loss_fake) / 2
 		self.d_loss = self.da_loss + self.db_loss
 
-		self.g_loss_a2b_sum = tf.summary.scalar("g_loss_a2b", self.g_loss_a2b)
+
+
+
+		self.g_loss_a2b_sum = tf.summary.scalar("g_loss_a2b", self.g_loss_a2b) # a2b loss (real and judge real) 
 		self.g_loss_b2a_sum = tf.summary.scalar("g_loss_b2a", self.g_loss_b2a)
 		self.g_loss_sum = tf.summary.scalar("g_loss", self.g_loss)
 		self.g_sum = tf.summary.merge([self.g_loss_a2b_sum, self.g_loss_b2a_sum, self.g_loss_sum])
-		self.db_loss_sum = tf.summary.scalar("db_loss", self.db_loss)
-		self.da_loss_sum = tf.summary.scalar("da_loss", self.da_loss)
-		self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss)
-		self.db_loss_real_sum = tf.summary.scalar("db_loss_real", self.db_loss_real)
-		self.db_loss_fake_sum = tf.summary.scalar("db_loss_fake", self.db_loss_fake)
-		self.da_loss_real_sum = tf.summary.scalar("da_loss_real", self.da_loss_real)
-		self.da_loss_fake_sum = tf.summary.scalar("da_loss_fake", self.da_loss_fake)
+
+		self.db_loss_sum = tf.summary.scalar("db_loss", self.db_loss) # total b loss
+		self.da_loss_sum = tf.summary.scalar("da_loss", self.da_loss) # total a loss
+		self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss) # total loss
+		self.db_loss_real_sum = tf.summary.scalar("db_loss_real", self.db_loss_real) # b loss (real and judge real) 
+		self.db_loss_fake_sum = tf.summary.scalar("db_loss_fake", self.db_loss_fake) # b loss (fake and judge fake) 
+		self.da_loss_real_sum = tf.summary.scalar("da_loss_real", self.da_loss_real) # a loss (real and judge real) 
+		self.da_loss_fake_sum = tf.summary.scalar("da_loss_fake", self.da_loss_fake) # a loss (fake and judge fake) 
 		self.d_sum = tf.summary.merge(
 		    [self.da_loss_sum, self.da_loss_real_sum, self.da_loss_fake_sum,
 		     self.db_loss_sum, self.db_loss_real_sum, self.db_loss_fake_sum,
