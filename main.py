@@ -5,11 +5,11 @@ tf.set_random_seed(19)
 from model import cyclegan
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--dataset_dir', dest='dataset_dir', default='edges2handbags', help='path of the dataset') # edges2handbags horse2zebra
+parser.add_argument('--dataset_dir', dest='dataset_dir', default='vangogh2photo', help='path of the dataset') # vangogh2photo # edges2handbags horse2zebra
 parser.add_argument('--epoch', dest='epoch', type=int, default=300, help='# of epoch') # 200 # 300
 parser.add_argument('--epoch_step', dest='epoch_step', type=int, default=100, help='# of epoch to decay lr')
 parser.add_argument('--batch_size', dest='batch_size', type=int, default=1, help='# images in batch')
-parser.add_argument('--train_size', dest='train_size', type=int, default=200, help='# images used to train') # 1e8 # 200
+parser.add_argument('--train_size', dest='train_size', type=int, default=400, help='# images used to train') # 1e8 # 200
 parser.add_argument('--load_size', dest='load_size', type=int, default=286, help='scale images to this size')
 parser.add_argument('--fine_size', dest='fine_size', type=int, default=256, help='then crop to this size')
 parser.add_argument('--ngf', dest='ngf', type=int, default=64, help='# of gen filters in first conv layer')

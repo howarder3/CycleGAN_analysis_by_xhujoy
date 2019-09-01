@@ -68,6 +68,7 @@ class cyclegan(object):
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
 		    + self.L1_lambda * abs_criterion(self.real_B, self.fake_B_)
 
+		# total loss
 		self.g_loss = self.criterionGAN(self.DA_fake, tf.ones_like(self.DA_fake)) \
 		    + self.criterionGAN(self.DB_fake, tf.ones_like(self.DB_fake)) \
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
@@ -94,19 +95,22 @@ class cyclegan(object):
 
 
 
-
+		# g summary
 		self.g_loss_a2b_sum = tf.summary.scalar("g_loss_a2b", self.g_loss_a2b) # a2b loss (real and judge real) 
 		self.g_loss_b2a_sum = tf.summary.scalar("g_loss_b2a", self.g_loss_b2a)
 		self.g_loss_sum = tf.summary.scalar("g_loss", self.g_loss)
 		self.g_sum = tf.summary.merge([self.g_loss_a2b_sum, self.g_loss_b2a_sum, self.g_loss_sum])
 
-		self.db_loss_sum = tf.summary.scalar("db_loss", self.db_loss) # total b loss
-		self.da_loss_sum = tf.summary.scalar("da_loss", self.da_loss) # total a loss
-		self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss) # total loss
+		# d summary
 		self.db_loss_real_sum = tf.summary.scalar("db_loss_real", self.db_loss_real) # b loss (real and judge real) 
 		self.db_loss_fake_sum = tf.summary.scalar("db_loss_fake", self.db_loss_fake) # b loss (fake and judge fake) 
+		self.db_loss_sum = tf.summary.scalar("db_loss", self.db_loss) # total b loss
+
 		self.da_loss_real_sum = tf.summary.scalar("da_loss_real", self.da_loss_real) # a loss (real and judge real) 
 		self.da_loss_fake_sum = tf.summary.scalar("da_loss_fake", self.da_loss_fake) # a loss (fake and judge fake) 
+		self.da_loss_sum = tf.summary.scalar("da_loss", self.da_loss) # total a loss
+
+		self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss) # total loss
 		self.d_sum = tf.summary.merge(
 		    [self.da_loss_sum, self.da_loss_real_sum, self.da_loss_fake_sum,
 		     self.db_loss_sum, self.db_loss_real_sum, self.db_loss_fake_sum,
@@ -158,10 +162,6 @@ class cyclegan(object):
 
 			test_dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testA'))
 			test_dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testB'))
-			test_batch_files = list(zip(test_dataA[:self.batch_size], test_dataB[:self.batch_size]))
-			test_sample_images = [load_train_data(batch_file, is_testing=True) for batch_file in test_batch_files]
-			test_sample_images = np.array(test_sample_images).astype(np.float32)
-
 
 			for idx in range(0, batch_idxs):
 				batch_files = list(zip(dataA[idx * self.batch_size:(idx + 1) * self.batch_size],
@@ -192,38 +192,48 @@ class cyclegan(object):
 				print(("Epoch: [%2d] [%4d/%4d] time: %4.4f" % (
 				    epoch, idx, batch_idxs, time.time() - start_time)))
 
-				if np.mod(counter, 1) == 0:
+				# if np.mod(counter, 1) == 0:
 
-					# real_A -> fake_B -> fake_A_
-					# real_B -> fake_A -> fake_B_
-					save_images(real_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_01_A2B_real_A.png'.format(self.output_dir, epoch, idx))
-					save_images(fake_B, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_03_B2A_gen_A.png'.format(self.output_dir, epoch, idx))
-					save_images(fake_A_, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_04_A2B_recover_A.png'.format(self.output_dir, epoch, idx))
+				# 	# real_A -> fake_B -> fake_A_
+				# 	# real_B -> fake_A -> fake_B_
+				# 	save_images(real_A, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_01_A2B_real_A.png'.format(self.output_dir, epoch, idx))
+				# 	save_images(fake_B, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_03_B2A_gen_A.png'.format(self.output_dir, epoch, idx))
+				# 	save_images(fake_A_, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_04_A2B_recover_A.png'.format(self.output_dir, epoch, idx))
 
 					
-					save_images(real_B, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_11_B2A_real_B.png'.format(self.output_dir, epoch, idx))
-					save_images(fake_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_13_B2A_gen_B.png'.format(self.output_dir, epoch, idx))
-					save_images(fake_B_, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_14_B2A_recover_B.png'.format(self.output_dir, epoch, idx))
+				# 	save_images(real_B, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_11_B2A_real_B.png'.format(self.output_dir, epoch, idx))
+				# 	save_images(fake_A, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_13_B2A_gen_B.png'.format(self.output_dir, epoch, idx))
+				# 	save_images(fake_B_, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_14_B2A_recover_B.png'.format(self.output_dir, epoch, idx))
 
 
-					# compare part
-					save_images(real_B, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_02_B2A_real_B.png'.format(self.output_dir, epoch, idx))
-					save_images(real_A, [self.batch_size, 1],
-						'./{}/ep{:02d}_{:04d}_12_A2B_real_A.png'.format(self.output_dir, epoch, idx))
+				# 	# compare part
+				# 	save_images(real_B, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_02_B2A_real_B.png'.format(self.output_dir, epoch, idx))
+				# 	save_images(real_A, [self.batch_size, 1],
+				# 		'./{}/ep{:02d}_{:04d}_12_A2B_real_A.png'.format(self.output_dir, epoch, idx))
 
 
 			for sample_index in range(min(len(test_dataA), len(test_dataB))):
 
+				test_batch_files = list(zip(test_dataA[sample_index * self.batch_size:(sample_index + 1) * self.batch_size],
+				                       		test_dataB[sample_index * self.batch_size:(sample_index + 1) * self.batch_size]))
+				test_batch_images = [load_train_data(test_batch_file, args.load_size, args.fine_size) for test_batch_file in test_batch_files]
+				test_batch_images = np.array(test_batch_images).astype(np.float32)
+
+
+				# test_batch_files = list(zip(test_dataA[:self.batch_size], test_dataB[:self.batch_size]))
+				# test_sample_images = [load_train_data(batch_file, is_testing=True) for batch_file in test_batch_files]
+				# test_sample_images = np.array(test_sample_images).astype(np.float32)
+
 				real_A, real_B, fake_A, fake_B, fake_A_, fake_B_,= self.sess.run(
 				    [self.real_A, self.real_B, self.fake_A, self.fake_B, self.fake_A_, self.fake_B_],
-				    feed_dict={self.real_data: test_sample_images})
+				    feed_dict={self.real_data: test_batch_images})
 
 	            # real_A -> fake_B -> fake_A_
 	            # real_B -> fake_A -> fake_B_
