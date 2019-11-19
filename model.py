@@ -10,6 +10,10 @@ from module import *
 from utils import *
 
 
+# 20191114 -> add vis_util: visualization (borrow from CoopNet)
+from vis_util import *
+
+
 class cyclegan(object):
 	def __init__(self, sess, args):
 		self.sess = sess
@@ -21,6 +25,11 @@ class cyclegan(object):
 		self.dataset_dir = args.dataset_dir
 		self.output_dir = args.output_dir
 		self.sample_dir = args.sample_dir
+
+		# 20191114 -> add log picutres
+		self.log_dir = args.log_dir
+
+
 
 		self.discriminator = discriminator
 		if args.use_resnet:
@@ -63,6 +72,10 @@ class cyclegan(object):
 		self.g_loss_a2b = self.criterionGAN(self.DB_fake, tf.ones_like(self.DB_fake)) \
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
 		    + self.L1_lambda * abs_criterion(self.real_B, self.fake_B_)
+
+
+
+
 		# b2a loss (fake and judge fake(ones_like)) 
 		self.g_loss_b2a = self.criterionGAN(self.DA_fake, tf.ones_like(self.DA_fake)) \
 		    + self.L1_lambda * abs_criterion(self.real_A, self.fake_A_) \
@@ -131,7 +144,36 @@ class cyclegan(object):
 		self.g_vars = [var for var in t_vars if 'generator' in var.name]
 		for var in t_vars: print(var.name)
 
+
+		# add cycle loss 20191114
+		self.cycle_loss_a2b2a = self.L1_lambda * abs_criterion(self.real_A, self.fake_A_)
+		self.cycle_loss_b2a2b = self.L1_lambda * abs_criterion(self.real_B, self.fake_B_)
+
 	def train(self, args):
+
+
+
+
+		# 20191114 -> add picture Visualizer
+
+
+
+		epoch_avg_A2B_des_loss_vis = Visualizer(title='epoch_avg_A2B_des_loss_vis', xlabel='training epoch_avgs', ylabel='epoch_avg_A2B_des_loss_vis',
+		                          save_figpath=self.log_dir + '/epoch_avg_A2B_des_loss_vis.png', avg_period = self.batch_size)
+		epoch_avg_A2B_gen_loss_vis = Visualizer(title='epoch_avg_A2B_gen_loss_vis', xlabel='training epoch_avgs', ylabel='epoch_avg_A2B_gen_loss_vis',
+		                          save_figpath=self.log_dir + '/epoch_avg_A2B_gen_loss_vis.png', avg_period = self.batch_size)
+		epoch_avg_A2B_cycle_loss_vis = Visualizer(title='epoch_avg_A2B_cycle_loss_vis', xlabel='training epoch_avgs', ylabel='epoch_avg_A2B_cycle_loss_vis', 
+		                  		  save_figpath=self.log_dir + '/epoch_avg_A2B_cycle_loss_vis.png', avg_period = self.batch_size)
+		epoch_avg_B2A_des_loss_vis = Visualizer(title='epoch_avg_B2A_des_loss_vis', xlabel='training epoch_avgs', ylabel='epoch_avg_B2A_des_loss_vis', 
+		                          save_figpath=self.log_dir + '/epoch_avg_B2A_des_loss_vis.png', avg_period = self.batch_size)
+		epoch_avg_B2A_gen_loss_vis = Visualizer(title='epoch_avg_B2A_gen_loss_vis', xlabel='training epoch_avgs', ylabel='epoch_avg_B2A_gen_loss_vis',
+		                          save_figpath=self.log_dir + '/epoch_avg_B2A_gen_loss_vis.png', avg_period = self.batch_size)
+		epoch_avg_B2A_cycle_loss_vis = Visualizer(title='epoch_avg_B2A_cycle_loss_vis', xlabel='training epoch_avgs', ylabel='epoch_avg_B2A_cycle_loss_vis', 
+		                  		  save_figpath=self.log_dir + '/epoch_avg_B2A_cycle_loss_vis.png', avg_period = self.batch_size)
+
+
+
+
 		# """Train cyclegan"""
 		self.lr = tf.placeholder(tf.float32, None, name='learning_rate')
 		self.d_optim = tf.train.AdamOptimizer(self.lr, beta1=args.beta1) \
@@ -153,6 +195,12 @@ class cyclegan(object):
 			    print(" [!] Load failed...")
 
 		for epoch in range(args.epoch):
+
+
+			A2B_des_loss_avg, A2B_gen_loss_avg, A2B_cycle_loss_avg = [], [], [] 
+			B2A_des_loss_avg, B2A_gen_loss_avg, B2A_cycle_loss_avg = [], [], [] 
+
+
 			dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/trainA'))
 			dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/trainB'))
 			np.random.shuffle(dataA)
@@ -173,20 +221,30 @@ class cyclegan(object):
 				# real_B -> fake_A -> fake_B_
 
 				# Update G network and record fake outputs
-				real_A, real_B, fake_A, fake_B, fake_A_, fake_B_, _, summary_str = self.sess.run(
-				    [self.real_A, self.real_B, self.fake_A, self.fake_B, self.fake_A_, self.fake_B_, self.g_optim, self.g_sum],
+				# 20191114 -> add get loss g_loss_a2b, g_loss_b2a
+				real_A, real_B, fake_A, fake_B, fake_A_, fake_B_, _, summary_str, g_loss_a2b, g_loss_b2a = self.sess.run(
+				    [self.real_A, self.real_B, self.fake_A, self.fake_B, self.fake_A_, self.fake_B_, self.g_optim, self.g_sum, self.g_loss_a2b, self.g_loss_b2a],
 				    feed_dict={self.real_data: batch_images, self.lr: lr})
 				self.writer.add_summary(summary_str, counter)
 				[fake_A, fake_B] = self.pool([fake_A, fake_B])
 
-				# Update D network
-				_, summary_str = self.sess.run(
-				    [self.d_optim, self.d_sum],
+				# 20191114 -> add get loss d_loss_a2b, d_loss_b2a, cycle_loss_a2b2a, cycle_loss_b2a2b	
+				_, summary_str, d_loss_a2b, d_loss_b2a, cycle_loss_a2b2a, cycle_loss_b2a2b = self.sess.run(
+				    [self.d_optim, self.d_sum, self.da_loss, self.db_loss, self.cycle_loss_a2b2a, self.cycle_loss_b2a2b ],
 				    feed_dict={self.real_data: batch_images,
 				               self.fake_A_sample: fake_A,
 				               self.fake_B_sample: fake_B,
 				               self.lr: lr})
 				self.writer.add_summary(summary_str, counter)
+
+
+				A2B_des_loss_avg.append(d_loss_a2b)
+				A2B_gen_loss_avg.append(g_loss_a2b)
+				A2B_cycle_loss_avg.append(cycle_loss_a2b2a)
+
+				B2A_des_loss_avg.append(d_loss_b2a)
+				B2A_gen_loss_avg.append(g_loss_b2a)
+				B2A_cycle_loss_avg.append(cycle_loss_b2a2b)
 
 				counter += 1
 				print(("Epoch: [%2d] [%4d/%4d] time: %4.4f" % (
@@ -223,7 +281,7 @@ class cyclegan(object):
 
 				test_batch_files = list(zip(test_dataA[sample_index * self.batch_size:(sample_index + 1) * self.batch_size],
 				                       		test_dataB[sample_index * self.batch_size:(sample_index + 1) * self.batch_size]))
-				test_batch_images = [load_train_data(test_batch_file, args.load_size, args.fine_size) for test_batch_file in test_batch_files]
+				test_batch_images = [load_train_data(test_batch_file, 286, 256, is_testing=True) for test_batch_file in test_batch_files]
 				test_batch_images = np.array(test_batch_images).astype(np.float32)
 
 
@@ -256,6 +314,25 @@ class cyclegan(object):
 							'./{}/testB_{:02d}_ep{:02d}_13_gen_B.png'.format(self.sample_dir, sample_index, epoch))
 				save_images(fake_B_, [self.batch_size, 1],
 							'./{}/testB_{:02d}_ep{:02d}_15_recovered_B.png'.format(self.sample_dir, sample_index, epoch))
+
+
+
+			epoch_avg_A2B_des_loss_vis.add_loss_val(epoch, np.mean(A2B_des_loss_avg))
+			epoch_avg_A2B_gen_loss_vis.add_loss_val(epoch, np.mean(A2B_gen_loss_avg))
+			epoch_avg_A2B_cycle_loss_vis.add_loss_val(epoch, np.mean(A2B_cycle_loss_avg))
+			epoch_avg_B2A_des_loss_vis.add_loss_val(epoch, np.mean(B2A_des_loss_avg))
+			epoch_avg_B2A_gen_loss_vis.add_loss_val(epoch, np.mean(B2A_gen_loss_avg))
+			epoch_avg_B2A_cycle_loss_vis.add_loss_val(epoch, np.mean(B2A_cycle_loss_avg))
+
+			epoch_avg_A2B_des_loss_vis.draw_figure()
+			epoch_avg_A2B_gen_loss_vis.draw_figure()
+			epoch_avg_A2B_cycle_loss_vis.draw_figure()
+			epoch_avg_B2A_des_loss_vis.draw_figure()
+			epoch_avg_B2A_gen_loss_vis.draw_figure()
+			epoch_avg_B2A_cycle_loss_vis.draw_figure()
+
+			self.save(args.checkpoint_dir, counter)
+					
 
 
 	def save(self, checkpoint_dir, step):

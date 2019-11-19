@@ -5,7 +5,7 @@ tf.set_random_seed(19)
 from model import cyclegan
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--dataset_dir', dest='dataset_dir', default='vangogh2photo', help='path of the dataset') # vangogh2photo # edges2handbags horse2zebra
+parser.add_argument('--dataset_dir', dest='dataset_dir', default='edges2handbags', help='path of the dataset') # vangogh2photo # edges2handbags horse2zebra
 parser.add_argument('--epoch', dest='epoch', type=int, default=300, help='# of epoch') # 200 # 300
 parser.add_argument('--epoch_step', dest='epoch_step', type=int, default=100, help='# of epoch to decay lr')
 parser.add_argument('--batch_size', dest='batch_size', type=int, default=1, help='# images in batch')
@@ -28,6 +28,8 @@ parser.add_argument('--sample_dir', dest='sample_dir', default='./sample', help=
 parser.add_argument('--test_dir', dest='test_dir', default='./test', help='test sample are saved here')
 parser.add_argument('--output_dir', dest='output_dir', default='./output', help='output sample are saved here')
 
+# 20191114 -> add log dir
+parser.add_argument('--log_dir', dest='log_dir', default='./log', help='log pictures')
 
 parser.add_argument('--L1_lambda', dest='L1_lambda', type=float, default=10.0, help='weight on L1 term in objective')
 parser.add_argument('--use_resnet', dest='use_resnet', type=bool, default=True, help='generation network using reidule block')
@@ -46,6 +48,8 @@ def main(_):
         os.makedirs(args.test_dir)
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
+    if not os.path.exists(args.log_dir):
+        os.makedirs(args.log_dir)
 
     tfconfig = tf.ConfigProto(allow_soft_placement=True)
     tfconfig.gpu_options.allow_growth = True

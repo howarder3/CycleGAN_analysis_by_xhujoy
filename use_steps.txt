@@ -7,7 +7,7 @@ python main.py
 
 # lab
 D:
-cd D:\GitHub\CycleGAN_analysis_by_xhujoy
+cd D:\GitHub\analysis_CycleGAN_by_xhujoy
 python main.py
 
 # mac
